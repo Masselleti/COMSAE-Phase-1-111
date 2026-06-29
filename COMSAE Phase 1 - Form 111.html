@@ -1317,9 +1317,9 @@
                 <div class="exam-setup lm-setup" id="learning-setup">
                     <button class="lm-back" onclick="showSection('main-menu')">← Back</button>
                     <h2 class="lm-title">Select Topics</h2>
-                    <p class="lm-desc">Check any combination of disciplines or blocks, then click <strong>Start Quiz</strong> to begin a learning-mode session with instant feedback.</p>
+                    <p class="lm-desc">Check any combination of disciplines or sections, then click <strong>Start Quiz</strong> to begin a learning-mode session with instant feedback.</p>
                     <div class="lm-tabs" id="lm-tabs">
-                        <button class="lm-tab active" id="lm-tab-block" onclick="lmSetTab('block')">By Block</button>
+                        <button class="lm-tab active" id="lm-tab-block" onclick="lmSetTab('block')">By Section</button>
                         <button class="lm-tab" id="lm-tab-disc" onclick="lmSetTab('discipline')">By Discipline</button>
                     </div>
                     <div class="loading" id="learning-loading">
@@ -1346,7 +1346,7 @@
 
                     <div class="lm-section-label">1 · Select Topics</div>
                     <div class="lm-tabs" id="ex-tabs">
-                        <button class="lm-tab active" id="ex-tab-block" onclick="exSetTab('block')">By Block</button>
+                        <button class="lm-tab active" id="ex-tab-block" onclick="exSetTab('block')">By Section</button>
                         <button class="lm-tab" id="ex-tab-disc" onclick="exSetTab('discipline')">By Discipline</button>
                     </div>
                     <div class="lm-note" id="ex-note"></div>
@@ -2175,6 +2175,10 @@
         const DISCIPLINE_MAP = {"1":"Physiology","2":"Pharmacology","3":"Pathology","4":"Pharmacology","5":"Pathology","6":"Pathology","7":"Gross Anatomy & Embryology","8":"Pharmacology","9":"Behavioral Sciences","10":"Pathology","11":"Gross Anatomy & Embryology","12":"Gross Anatomy & Embryology","13":"Pharmacology","14":"Gross Anatomy & Embryology","15":"Pharmacology","16":"Pathology","17":"Pharmacology","18":"Behavioral Sciences","19":"Microbiology","20":"Pharmacology","21":"Pathology","22":"Pharmacology","23":"Gross Anatomy & Embryology","24":"Pathology","25":"Microbiology","26":"Microbiology","27":"Pathology","28":"Pathology","29":"Biochemistry & Nutrition","30":"Microbiology","31":"Pathology","32":"Behavioral Sciences","33":"Pathology","34":"Pathology","35":"Pathology","36":"Pharmacology","37":"Gross Anatomy & Embryology","38":"Pathology","39":"Microbiology","40":"Pharmacology","41":"Pharmacology","42":"Pathology","43":"Gross Anatomy & Embryology","44":"Microbiology","45":"Pathology","46":"Gross Anatomy & Embryology","47":"OMM","48":"Pathology","49":"Pathology","50":"Pathology","51":"Behavioral Sciences","52":"OMM","53":"Gross Anatomy & Embryology","54":"OMM","55":"Pathology","56":"Gross Anatomy & Embryology","57":"Physiology","58":"Pathology","59":"Pathology","60":"Pathology","61":"Pathology","62":"Gross Anatomy & Embryology","63":"Pathology","64":"Microbiology","65":"Pharmacology","66":"Microbiology","67":"Pathology","68":"Gross Anatomy & Embryology","69":"Microbiology","70":"Microbiology","71":"Physiology","72":"Pathology","73":"OMM","74":"Behavioral Sciences","75":"OMM","76":"Pathology","77":"Pathology","78":"Pathology","79":"Pathology","80":"Pathology","81":"OMM","82":"OMM"};
         const DISCIPLINE_DEFS = [{"name": "Pathology", "range": "45-55"}, {"name": "Physiology", "range": "30-40"}, {"name": "Pharmacology", "range": "10-20"}, {"name": "Biochemistry & Nutrition", "range": "5-15"}, {"name": "Microbiology", "range": "10-20"}, {"name": "Immunology", "range": "5-15"}, {"name": "Gross Anatomy & Embryology", "range": "10-20"}, {"name": "Histology & Cell Biology", "range": "5-15"}, {"name": "Behavioral Sciences", "range": "10-15"}, {"name": "Genetics", "range": "5-10"}, {"name": "OMM", "range": "5-15"}];
 
+        // Exam Sections (the "By Section" tab). Membership is by question-id range;
+        // counts are computed live from the DB, so empty sections auto-disable.
+        const SECTION_DEFS = [{"num": 1, "name": "Section 1", "start": 1, "end": 44}, {"num": 2, "name": "Section 2", "start": 45, "end": 88}, {"num": 3, "name": "Section 3", "start": 89, "end": 132}, {"num": 4, "name": "Section 4", "start": 133, "end": 176}];
+
         let lmView = 'discipline';
         let lmSel = { discipline: new Set(), block: new Set() };
         let lmBlocks = [];
@@ -2198,13 +2202,16 @@
             lmSetTab('block');
         }
 
+        // Returns the exam Sections with question counts computed from the DB (by id range).
         function lmQueryBlocks() {
-            try {
-                const r = currentDatabase.exec("SELECT id, name, count FROM Subjects ORDER BY id");
-                if (r.length && r[0].values.length)
-                    return r[0].values.map(v => ({ id: v[0], name: v[1], count: parseInt(v[2]) || 0 }));
-            } catch (e) {}
-            return [];
+            return SECTION_DEFS.map(s => {
+                let count = 0;
+                try {
+                    const r = currentDatabase.exec("SELECT COUNT(*) FROM Questions WHERE id BETWEEN " + s.start + " AND " + s.end);
+                    if (r.length && r[0].values.length) count = parseInt(r[0].values[0][0]) || 0;
+                } catch (e) {}
+                return { num: s.num, name: s.name, start: s.start, end: s.end, count: count };
+            });
         }
 
         function lmSetTab(view) {
@@ -2231,7 +2238,7 @@
             } else {
                 note.style.display = 'none';
                 lmBlocks.forEach(b => {
-                    grid.appendChild(lmRow('block', String(b.id), b.name, '50-item exam block', b.count, b.count === 0));
+                    grid.appendChild(lmRow('block', String(b.num), b.name, '44-item exam section', b.count, b.count === 0));
                 });
             }
         }
@@ -2261,10 +2268,11 @@
             } else {
                 const sel = lmSel.block;
                 if (sel.size) {
-                    const list = [...sel].map(Number).filter(x => !isNaN(x));
-                    if (list.length) {
+                    for (const k of sel) {
+                        const s = SECTION_DEFS.find(x => String(x.num) === String(k));
+                        if (!s) continue;
                         try {
-                            const r = currentDatabase.exec("SELECT id FROM Questions WHERE subId IN (" + list.join(',') + ")");
+                            const r = currentDatabase.exec("SELECT id FROM Questions WHERE id BETWEEN " + s.start + " AND " + s.end);
                             if (r.length) r[0].values.forEach(v => ids.add(v[0]));
                         } catch (e) {}
                     }
@@ -2278,7 +2286,7 @@
                 const counts = disciplineCounts();
                 return DISCIPLINE_DEFS.filter(d => (counts[d.name] || 0) > 0).map(d => d.name);
             }
-            return lmBlocks.filter(b => b.count > 0).map(b => String(b.id));
+            return lmBlocks.filter(b => b.count > 0).map(b => String(b.num));
         }
 
         function lmUpdateBar() {
@@ -2353,7 +2361,7 @@
             } else {
                 note.style.display = 'none';
                 lmBlocks.forEach(b => {
-                    grid.appendChild(exRow('block', String(b.id), b.name, '50-item exam block', b.count, b.count === 0));
+                    grid.appendChild(exRow('block', String(b.num), b.name, '44-item exam section', b.count, b.count === 0));
                 });
             }
         }
@@ -2383,10 +2391,11 @@
             } else {
                 const sel = exSel.block;
                 if (sel.size) {
-                    const list = [...sel].map(Number).filter(x => !isNaN(x));
-                    if (list.length) {
+                    for (const k of sel) {
+                        const s = SECTION_DEFS.find(x => String(x.num) === String(k));
+                        if (!s) continue;
                         try {
-                            const r = currentDatabase.exec("SELECT id FROM Questions WHERE subId IN (" + list.join(',') + ")");
+                            const r = currentDatabase.exec("SELECT id FROM Questions WHERE id BETWEEN " + s.start + " AND " + s.end);
                             if (r.length) r[0].values.forEach(v => ids.add(v[0]));
                         } catch (e) {}
                     }
@@ -2400,7 +2409,7 @@
                 const counts = disciplineCounts();
                 return DISCIPLINE_DEFS.filter(d => (counts[d.name] || 0) > 0).map(d => d.name);
             }
-            return lmBlocks.filter(b => b.count > 0).map(b => String(b.id));
+            return lmBlocks.filter(b => b.count > 0).map(b => String(b.num));
         }
 
         function exUpdateBar() {
