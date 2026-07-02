@@ -2565,7 +2565,7 @@
             }
 
             let flagCount = 0;
-            for (let i = 0; i < localStorage.length; i++) { if (localStorage.key(i).startsWith('MA_FLAG|||')) flagCount++; }
+            for (let i = 0; i < localStorage.length; i++) { if (localStorage.key(i).startsWith('MA_FLAG|||' + FORM_DB_PATH + '|||')) flagCount++; }
             if (flagCount > 0) {
                 hasActivity = true;
                 container.innerHTML += `<div class="menu-card flag-card" onclick="startFlaggedReview()">
@@ -2583,7 +2583,7 @@
             currentQuestions = [];
             for (let i = 0; i < localStorage.length; i++) {
                 const key = localStorage.key(i);
-                if (key.startsWith('MA_FLAG|||')) {
+                if (key.startsWith('MA_FLAG|||' + FORM_DB_PATH + '|||')) {
                     const parts = key.split('|||');
                     if (parts.length === 3) currentQuestions.push({ id: parseInt(parts[2]), dbPath: parts[1] });
                 }
@@ -2591,7 +2591,7 @@
             if (currentQuestions.length === 0) return alert("No flagged questions found.");
             currentQuestionIndex = 0; userAnswers = {}; learningAnswered = false; currentMode = 'learning';
             showSection('learning-mode');
-            document.getElementById('learning-categories-tree').style.display = 'none';
+            var __lmTree = document.getElementById('learning-categories-tree'); if (__lmTree) __lmTree.style.display = 'none';
             document.getElementById('learning-setup').style.display = 'none';
             document.getElementById('learning-questions').style.display = 'block';
             await displayQuestion();
